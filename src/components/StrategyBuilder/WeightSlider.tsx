@@ -1,12 +1,12 @@
-import { useDispatch, useSelector } from "react-redux";
-import type { RootState } from "../../store";
-import { updateAssetWeight } from "../../store/strategySlice";
+import {useDispatch, useSelector} from "react-redux";
+import type {RootState} from "../../store";
+import {updateAssetWeight} from "../../store/strategySlice";
 
 type Props = {
     id: string;
 };
 
-export default function WeightSlider({ id }: Props) {
+export default function WeightSlider({id}: Props) {
     const dispatch = useDispatch();
     const weight = useSelector((state: RootState) =>
         state.strategy.assets.find((a) => a.id === id)?.weight || 0
@@ -20,7 +20,7 @@ export default function WeightSlider({ id }: Props) {
                 max="100"
                 value={weight}
                 onChange={(e) =>
-                    dispatch(updateAssetWeight({ id, weight: Number(e.target.value) }))
+                    dispatch(updateAssetWeight({id, weight: Number(e.target.value)}))
                 }
                 className="w-full"
             />

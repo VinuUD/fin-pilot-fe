@@ -11,7 +11,7 @@ export default function AssetSelector({id}: Props) {
     const value = useSelector((state: RootState) =>
         state.strategy.assets.find((a) => a.id === id)?.category || ""
     );
-
+    console.log("Rendering", id, "with value", value);
     return (
         <select
             className="w-full p-2 bg-gray-700 text-white rounded"
@@ -21,10 +21,10 @@ export default function AssetSelector({id}: Props) {
             }
         >
             <option value="">Select Asset Category</option>
-            <option value="tech">Technology</option>
-            <option value="energy">Energy</option>
-            <option value="finance">Finance</option>
-            <option value="health">Healthcare</option>
+            <option value="Technology">Technology</option>
+            <option value="Energy">Energy</option>
+            <option value="Finance">Finance</option>
+            <option value="Healthcare">Healthcare</option>
         </select>
     );
 }

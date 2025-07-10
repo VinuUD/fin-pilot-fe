@@ -1,5 +1,5 @@
-import { createSlice, type PayloadAction } from "@reduxjs/toolkit";
-import { v4 as uuidv4 } from "uuid";
+import {createSlice, type PayloadAction} from "@reduxjs/toolkit";
+import {v4 as uuidv4} from "uuid";
 
 type Asset = {
     id: string;
@@ -15,7 +15,7 @@ type StrategyState = {
 const initialState: StrategyState = {
     name: "My Strategy",
     assets: [
-        { id: uuidv4(), category: "", weight: 25 },
+        {id: uuidv4(), category: "", weight: 25},
     ],
 };
 
@@ -42,18 +42,25 @@ const strategySlice = createSlice({
                 asset.weight = action.payload.weight;
             }
         },
-        setStrategyName(state, action: PayloadAction<string>) {
+        setStrategyName(state: StrategyState, action: PayloadAction<string>) {
             state.name = action.payload;
         },
         setAssets(state, action: PayloadAction<Asset[]>) {
             state.assets = action.payload;
         },
         clearStrategy(state) {
-            state.name = "My Strategy";
-            state.assets = [{ id: uuidv4(), category: "", weight: 25 }];
+            state.name = "";
+            state.assets = [{id: uuidv4(), category: "", weight: 25}];
         }
     },
 });
 
-export const { addAsset, updateAssetCategory, updateAssetWeight, setStrategyName, clearStrategy, setAssets } = strategySlice.actions;
+export const {
+    addAsset,
+    updateAssetCategory,
+    updateAssetWeight,
+    setStrategyName,
+    clearStrategy,
+    setAssets
+} = strategySlice.actions;
 export default strategySlice.reducer;
