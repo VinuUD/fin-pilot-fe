@@ -1,3 +1,25 @@
+# FinPilot Frontend
+
+FinPilot is a React + TypeScript application for building and analyzing investment strategies. It includes a strategy builder interface and a dashboard to manage and review saved strategies.
+
+## Getting Started
+
+To set up and run the frontend locally:
+
+```bash
+# Clone the repository
+git clone https://github.com/your-org/fin-pilot-fe.git
+cd fin-pilot-fe
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+The app will be available at `http://localhost:5173`.
+
 # React + TypeScript + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
