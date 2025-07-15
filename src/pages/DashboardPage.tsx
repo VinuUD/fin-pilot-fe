@@ -1,25 +1,19 @@
-import {useNavigate} from "react-router-dom";
-import {useEffect, useState} from "react";
+import {useNavigate} from "@tanstack/react-router";
 import {useDispatch} from "react-redux";
 import {setStrategyName, setAssets} from "../store/strategySlice";
+import {useQuery} from '@tanstack/react-query';
 
 export default function DashboardPage() {
     const navigate = useNavigate();
     const dispatch = useDispatch();
-    const [savedStrategies, setSavedStrategies] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        fetch("http://localhost:8000/strategies")
-            .then((res) => {
-                if (!res.ok) throw new Error("Failed to load strategies");
-                return res.json();
-            })
-            .then(setSavedStrategies)
-            .catch((err) => setError(err.message))
-            .finally(() => setLoading(false));
-    }, []);
+    const {data: savedStrategies = [], isLoading: loading, error} = useQuery({
+        queryKey: ['strategies'],
+        queryFn: async () => {
+            const res = await fetch("http://localhost:8000/strategies");
+            if (!res.ok) throw new Error("Failed to load strategies");
+            return res.json();
+        },
+    });
 
     return (
         <div className="flex min-h-screen bg-gray-950 text-white">
@@ -29,7 +23,7 @@ export default function DashboardPage() {
                     onClick={() => {
                         dispatch(setStrategyName(""));
                         dispatch(setAssets([]));
-                        navigate("/strategy");
+                        navigate({to: "/strategy", search: {name: ""}});
                     }}
                     className="px-5 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-sm font-medium"
                 >
@@ -40,12 +34,16 @@ export default function DashboardPage() {
                     {loading ? (
                         <p className="text-gray-400">Loading strategies...</p>
                     ) : error ? (
-                        <p className="text-red-400">Error: {error}</p>
+                        <p className="text-red-400">Error: {error.message}</p>
                     ) : savedStrategies.length === 0 ? (
                         <p className="text-gray-400">No strategies saved yet.</p>
                     ) : (
                         <ul className="space-y-2">
-                            {savedStrategies.map((s) => (
+                            {savedStrategies.map((s: {
+                                name: string;
+                                assets: any[];
+                                stats: { return: any; sharpe: any; };
+                            }) => (
                                 <li
                                     key={s.name}
                                     className="border-b border-gray-700 py-3 px-2 hover:bg-gray-700/40 rounded transition min-w-0"
@@ -65,7 +63,7 @@ export default function DashboardPage() {
                                                         }))
                                                     )
                                                 );
-                                                navigate("/strategy");
+                                                navigate({to: "/strategy", search: {name: s.name}});
                                             }}
                                             className="text-sm text-blue-400 hover:underline"
                                         >
