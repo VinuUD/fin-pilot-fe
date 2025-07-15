@@ -1,8 +1,8 @@
-import {useState, useEffect} from "react";
-import {useNavigate} from "react-router-dom";
+import {useState} from "react";
+import {useNavigate, useSearch} from "@tanstack/react-router";
 import {useSelector, useDispatch} from "react-redux";
 import type {RootState} from "../../store";
-import {addAsset, setStrategyName, clearStrategy, setAssets} from "../../store/strategySlice";
+import {addAsset, setStrategyName, clearStrategy, setAssets, type StrategyState} from "../../store/strategySlice";
 import AssetSelector from "./AssetSelector";
 import WeightSlider from "./WeightSlider";
 
@@ -15,43 +15,71 @@ import {
     loadStrategyByName
 } from "../../services/api.ts";
 import toast from "react-hot-toast";
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 
 export default function StrategyBuilder() {
     const [isLoading, setIsLoading] = useState(false);
-    const [isLoadingStrategies, setIsLoadingStrategies] = useState(false);
     const [results, setResults] = useState<null | {
         return: number;
         sharpe: number;
     }>(null);
-    const [reloadListKey, setReloadListKey] = useState(0);
-
-    const [savedStrategies, setSavedStrategies] = useState<any[]>([]);
 
     const dispatch = useDispatch();
+    useSearch({from: '/strategy'});
 
-    useEffect(() => {
-        const fetchData = async () => {
-            setIsLoadingStrategies(true);
-            try {
-                const result = await loadStrategies();
-                setSavedStrategies(result);
-                // After loading, if strategyName exists in result, dispatch its name and assets
-                const found = result.find((s: any) => s.name === strategyName);
-                if (found) {
-                    dispatch(setStrategyName(found.name));
-                    dispatch(setAssets(found.assets.map((a: any) => ({...a, id: crypto.randomUUID()}))));
-                }
-            } catch (err: any) {
-                console.error("API Error:", err);
-                toast.error(err?.response?.data?.detail || "An error occurred.");
-            } finally {
-                setIsLoadingStrategies(false);
-            }
-        };
-        fetchData();
-    }, [reloadListKey]);
+    const { data: savedStrategies = [], isLoading: isLoadingStrategies } = useQuery({
+      queryKey: ['strategies'],
+      queryFn: loadStrategies,
+      staleTime: 1000 * 60, // 1 minute cache
+    });
 
     const navigate = useNavigate();
+
+    const queryClient = useQueryClient();
+
+    const saveStrategyMutation = useMutation({
+      mutationFn: saveStrategy,
+      onSuccess: () => {
+        toast.success("Strategy saved!");
+        queryClient.invalidateQueries({ queryKey: ['strategies'] });
+      },
+      onError: (err: any) => {
+        console.error("API Error:", err);
+        toast.error(err?.response?.data?.detail || "An error occurred.");
+      }
+    });
+
+    const deleteStrategyMutation = useMutation({
+      mutationFn: deleteStrategy,
+      onSuccess: () => {
+        toast.success("Strategy deleted!");
+      },
+      onError: (err: any) => {
+        console.error("API Error:", err);
+        toast.error(err?.response?.data?.detail || "An error occurred.");
+      },
+    });
+
+    const backtestMutation = useMutation({
+      mutationFn: simulateStrategy,
+      onMutate: () => {
+        setIsLoading(true);
+        setResults(null);
+      },
+      onSuccess: (response) => {
+        setResults({
+          return: response.return_,
+          sharpe: response.sharpe,
+        });
+      },
+      onError: (err: any) => {
+        console.error("API Error:", err);
+        toast.error(err?.response?.data?.detail || "An error occurred.");
+      },
+      onSettled: () => {
+        setIsLoading(false);
+      },
+    });
 
     const strategyAssets = useSelector((state: RootState) => state.strategy.assets);
     const strategyName = useSelector((state: RootState) => state.strategy.name);
@@ -67,35 +95,15 @@ export default function StrategyBuilder() {
 
     const COLORS = ["#4ade80", "#60a5fa", "#facc15", "#f87171", "#a78bfa"];
 
-    const handleBacktest = async () => {
-        setIsLoading(true);
-        setResults(null);
-        try {
-            const response = await simulateStrategy({
-                name: strategyName,
-                assets: strategyAssets
-            });
-            setResults({
-                return: response.return_,
-                sharpe: response.sharpe
-            });
-        } catch (err: any) {
-            console.error("API Error:", err);
-            toast.error(err?.response?.data?.detail || "An error occurred.");
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
     // Check for existing strategy name in savedStrategies
-    const strategyExists = savedStrategies.some((s) => s.name === strategyName);
+    const strategyExists = savedStrategies.some((s: StrategyState) => s.name === strategyName);
 
     return (
         <div className="flex flex-col lg:flex-row gap-8">
             {/* Saved strategies column */}
             <div className="w-full lg:w-[20rem] space-y-6">
                 <button
-                    onClick={() => navigate("/")}
+                    onClick={() => navigate({ to: '/'})}
                     className="text-sm text-blue-400 hover:underline"
                 >
                     ← Back to Home
@@ -106,8 +114,8 @@ export default function StrategyBuilder() {
                         <p className="text-sm text-gray-400">Loading strategies...</p>
                     ) : (
                         <ul className="space-y-1">
-                            {savedStrategies.map((s) => (
-                                <li key={reloadListKey + s.name}
+                            {savedStrategies.map((s: StrategyState) => (
+                                <li key={s.name}
                                     className="flex justify-between items-center border-b border-gray-700 py-1">
                                     <span>{s.name}</span>
                                     <button
@@ -120,7 +128,9 @@ export default function StrategyBuilder() {
                                                     id: crypto.randomUUID() // Ensure unique IDs
                                                 }))));
                                                 if (window.location.pathname !== "/strategy") {
-                                                    navigate("/strategy");
+                                                    navigate({ to: '/strategy', search: { name: s.name } });
+                                                } else {
+                                                    navigate({ to: '/strategy', search: { name: s.name } });
                                                 }
                                             } catch (err: any) {
                                                 console.error("API Error:", err);
@@ -155,14 +165,7 @@ export default function StrategyBuilder() {
                 <button
                     onClick={async () => {
                         if (!confirm(`Delete strategy "${strategyName}"?`)) return;
-                        try {
-                            await deleteStrategy(strategyName);
-                            setReloadListKey((prev) => prev + 1);
-                            toast.success("Strategy deleted!");
-                        } catch (err: any) {
-                            console.error("API Error:", err);
-                            toast.error(err?.response?.data?.detail || "An error occurred.");
-                        }
+                        deleteStrategyMutation.mutate(strategyName);
                     }}
                     className="px-4 py-2 bg-yellow-600 hover:bg-yellow-700 text-white rounded mb-2"
                 >
@@ -194,7 +197,12 @@ export default function StrategyBuilder() {
                 {/* Run Backtest */}
                 <button
                     disabled={totalWeight !== 100 || isLoading}
-                    onClick={handleBacktest}
+                    onClick={() =>
+                        backtestMutation.mutate({
+                            name: strategyName,
+                            assets: strategyAssets,
+                        })
+                    }
                     className={`px-4 py-2 rounded text-white ${
                         totalWeight === 100 && !isLoading
                             ? "bg-green-600 hover:bg-green-700"
@@ -208,16 +216,7 @@ export default function StrategyBuilder() {
                 <div className="flex flex-wrap gap-4">
                     <button
                         disabled={!strategyExists}
-                        onClick={async () => {
-                            try {
-                                await saveStrategy({name: strategyName, assets: strategyAssets});
-                                setReloadListKey((prev) => prev + 1);
-                                toast.success("Strategy updated!");
-                            } catch (err: any) {
-                                console.error("API Error:", err);
-                                toast.error(err?.response?.data?.detail || "An error occurred.");
-                            }
-                        }}
+                        onClick={() => saveStrategyMutation.mutate({ name: strategyName, assets: strategyAssets })}
                         className={`px-4 py-2 text-white rounded ${
                             strategyExists ? "bg-blue-600 hover:bg-blue-700" : "bg-gray-600 cursor-not-allowed"
                         }`}
@@ -227,16 +226,12 @@ export default function StrategyBuilder() {
 
                     <button
                         disabled={strategyExists}
-                        onClick={async () => {
-                            try {
-                                await saveStrategy({name: strategyName, assets: strategyAssets}).then(() => {
-                                    setReloadListKey((prev) => prev + 1);
-                                    toast.success("Strategy saved as new!");
-                                });
-                            } catch (err: any) {
-                                console.error("API Error:", err);
-                                toast.error(err?.response?.data?.detail || "An error occurred.");
+                        onClick={() => {
+                            if (strategyExists) {
+                                toast.error("A strategy with this name already exists. Choose a different name.");
+                                return;
                             }
+                            saveStrategyMutation.mutate({ name: strategyName, assets: strategyAssets });
                         }}
                         className={`px-4 py-2 text-white rounded ${
                             !strategyExists ? "bg-green-600 hover:bg-green-700" : "bg-gray-600 cursor-not-allowed"

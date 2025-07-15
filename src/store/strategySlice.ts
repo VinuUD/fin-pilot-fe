@@ -7,7 +7,7 @@ type Asset = {
     weight: number;
 };
 
-type StrategyState = {
+export type StrategyState = {
     name: string;
     assets: Asset[];
 };
